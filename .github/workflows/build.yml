@@ -1,0 +1,33 @@
+name: Build executables
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller --onefile main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: mon_app-${{ matrix.os }}
+          path: dist/
+
