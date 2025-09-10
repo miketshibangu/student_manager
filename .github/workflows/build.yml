@@ -12,19 +12,32 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
+      # 1️⃣ Récupérer le code
       - uses: actions/checkout@v4
 
+      # 2️⃣ Installer Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'  # correspond à ton environnement local
 
+      # 3️⃣ Installer les dépendances Python
       - name: Install dependencies
-        run: pip install pyinstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
+      # 4️⃣ Compiler l’exécutable
       - name: Build executable
-        run: pyinstaller --onefile main.py
+        run: |
+          pyinstaller --onefile \
+                      --hidden-import=PySide6 \
+                      --hidden-import=PySide6_Addons \
+                      --hidden-import=PySide6_Essentials \
+                      main.py
 
+      # 5️⃣ Télécharger le binaire
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
