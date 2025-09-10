@@ -12,23 +12,19 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      # 1️⃣ Checkout du code
       - uses: actions/checkout@v4
 
-      # 2️⃣ Installer Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 3️⃣ Installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # 4️⃣ Build executable Linux/macOS
       - name: Build executable (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
@@ -47,7 +43,6 @@ jobs:
                       --hidden-import=PySide6_Essentials \
                       main.py
 
-      # 5️⃣ Build executable Windows
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -58,29 +53,20 @@ jobs:
                       --hidden-import=PySide6_Addons \
                       --hidden-import=PySide6_Essentials \
                       main.py
-        shell: bash
+        shell: pwsh
 
-      # 6️⃣ Préparer ZIP final avec binaire + icônes (Linux/macOS)
       - name: Package ZIP (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p dist/package
-          cp dist/student_manager* dist/package/
-          cp -r assets/icons dist/package/
           cd dist
-          zip -r student_manager-${{ matrix.os }}.zip package
+          zip -r student_manager-${{ matrix.os }}.zip student_manager assets/icons
 
-      # 7️⃣ Préparer ZIP final avec binaire + icônes (Windows)
       - name: Package ZIP (Windows)
         if: runner.os == 'Windows'
         run: |
-          New-Item -ItemType Directory -Force -Path dist/package
-          Copy-Item dist/student_manager* dist/package/
-          Copy-Item -Recurse assets/icons dist/package/
-          Compress-Archive -Path dist/package/* -DestinationPath dist/student_manager-windows-latest.zip
+          Compress-Archive -Path dist/student_manager.exe,assets/icons -DestinationPath dist/student_manager-windows-latest.zip
         shell: pwsh
 
-      # 8️⃣ Upload artifact
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
