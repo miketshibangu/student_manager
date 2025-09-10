@@ -1,4 +1,4 @@
-name: Build executables
+name: Build Executables
 
 on:
   push:
@@ -12,19 +12,23 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
+      # 1️⃣ Récupérer le code
       - uses: actions/checkout@v4
 
+      # 2️⃣ Installer Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # 3️⃣ Installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
+      # 4️⃣ Build executable Linux/macOS
       - name: Build executable (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
@@ -34,7 +38,6 @@ jobs:
           else
               ICON="$ICON_PATH.png"
           fi
-
           pyinstaller --onefile \
                       --name student_manager \
                       --icon "$ICON" \
@@ -43,6 +46,7 @@ jobs:
                       --hidden-import=PySide6_Essentials \
                       main.py
 
+      # 5️⃣ Build executable Windows
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -55,21 +59,26 @@ jobs:
                       main.py
         shell: pwsh
 
+      # 6️⃣ Créer ZIP Linux/macOS
       - name: Package ZIP (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           cd dist
           zip -r student_manager-${{ matrix.os }}.zip student_manager assets/icons
 
+      # 7️⃣ Créer ZIP Windows
       - name: Package ZIP (Windows)
         if: runner.os == 'Windows'
         run: |
           Compress-Archive -Path dist/student_manager.exe,assets/icons -DestinationPath dist/student_manager-windows-latest.zip
         shell: pwsh
 
+      # 8️⃣ Upload artifacts
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: student_manager-${{ matrix.os }}
-          path: dist/student_manager-${{ matrix.os }}.zip
+          path: |
+            dist/student_manager-${{ matrix.os }}.zip
+            dist/student_manager-windows-latest.zip
 
