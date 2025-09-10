@@ -50,10 +50,19 @@ jobs:
       # 5️⃣ Build executable Windows
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
-        run: pyinstaller --onefile --name student_manager --icon assets/icons/app_icon.ico --hidden-import=PySide6 --hidden-import=PySide6_Addons --hidden-import=PySide6_Essentials main.py
+        run: |
+          pyinstaller --onefile \
+                      --name student_manager \
+                      --icon assets/icons/app_icon.ico \
+                      --hidden-import=PySide6 \
+                      --hidden-import=PySide6_Addons \
+                      --hidden-import=PySide6_Essentials \
+                      main.py
+        shell: bash
 
-      # 6️⃣ Préparer ZIP final avec binaire + icônes
-      - name: Package ZIP
+      # 6️⃣ Préparer ZIP final avec binaire + icônes (Linux/macOS)
+      - name: Package ZIP (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p dist/package
           cp dist/student_manager* dist/package/
@@ -61,7 +70,17 @@ jobs:
           cd dist
           zip -r student_manager-${{ matrix.os }}.zip package
 
-      # 7️⃣ Upload artifact
+      # 7️⃣ Préparer ZIP final avec binaire + icônes (Windows)
+      - name: Package ZIP (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/package
+          Copy-Item dist/student_manager* dist/package/
+          Copy-Item -Recurse assets/icons dist/package/
+          Compress-Archive -Path dist/package/* -DestinationPath dist/student_manager-windows-latest.zip
+        shell: pwsh
+
+      # 8️⃣ Upload artifact
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
