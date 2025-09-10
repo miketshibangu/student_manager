@@ -1,0 +1,9 @@
+# Ignorer dossiers PyInstaller
+/dist
+/build
+/*.spec
+
+# Ignorer les fichiers temporaires
+*.pyc
+__pycache__/
+
