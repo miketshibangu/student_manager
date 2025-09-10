@@ -12,35 +12,59 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      # 1️⃣ Récupérer le code
+      # 1️⃣ Checkout du code
       - uses: actions/checkout@v4
 
       # 2️⃣ Installer Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  # correspond à ton environnement local
+          python-version: '3.12'
 
-      # 3️⃣ Installer les dépendances Python
+      # 3️⃣ Installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # 4️⃣ Compiler l’exécutable
-      - name: Build executable
+      # 4️⃣ Build executable Linux/macOS
+      - name: Build executable (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
+          ICON_PATH="assets/icons/app_icon"
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+              ICON="$ICON_PATH.icns"
+          else
+              ICON="$ICON_PATH.png"
+          fi
+
           pyinstaller --onefile \
+                      --name student_manager \
+                      --icon "$ICON" \
                       --hidden-import=PySide6 \
                       --hidden-import=PySide6_Addons \
                       --hidden-import=PySide6_Essentials \
                       main.py
 
-      # 5️⃣ Télécharger le binaire
+      # 5️⃣ Build executable Windows
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        run: pyinstaller --onefile --name student_manager --icon assets/icons/app_icon.ico --hidden-import=PySide6 --hidden-import=PySide6_Addons --hidden-import=PySide6_Essentials main.py
+
+      # 6️⃣ Préparer ZIP final avec binaire + icônes
+      - name: Package ZIP
+        run: |
+          mkdir -p dist/package
+          cp dist/student_manager* dist/package/
+          cp -r assets/icons dist/package/
+          cd dist
+          zip -r student_manager-${{ matrix.os }}.zip package
+
+      # 7️⃣ Upload artifact
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mon_app-${{ matrix.os }}
-          path: dist/
+          name: student_manager-${{ matrix.os }}
+          path: dist/student_manager-${{ matrix.os }}.zip
 
