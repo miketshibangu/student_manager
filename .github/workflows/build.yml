@@ -14,15 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug structure
-        run: |
-          echo "=== STRUCTURE DU PROJET ==="
-          dir || ls -la
-          echo "=== REQUIREMENTS.TXT ==="
-          type requirements.txt || cat requirements.txt || echo "Fichier requirements.txt introuvable"
-          echo "=== ICONES ==="
-          dir assets\\icons || ls -la assets/icons/ || echo "Dossier icons non trouvé"
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -40,15 +31,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-xinerama0 libgl1-mesa-dev
 
-      - name: Simple build test
+      - name: Build application
         run: |
-          echo "=== TEST SIMPLE SANS ICONE ==="
-          pyinstaller --onefile --name mon_app main.py
-          echo "Build terminé"
+          pyinstaller --onefile --name mon_app --collect-all PySide6 main.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.os }}
           path: dist/
-          if-no-files-found: error
