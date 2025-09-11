@@ -28,7 +28,7 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # 4️⃣ Build executable avec gestion des icônes
+      # 4️⃣ Build executable
       - name: Build executable
         run: |
           # Déterminer l'extension de l'icône
@@ -52,30 +52,34 @@ jobs:
                       main.py
         shell: bash
 
-      # 5️⃣ Créer le package ZIP
+      # 5️⃣ Créer le package ZIP CORRIGÉ
       - name: Create package
         run: |
-          # Créer le répertoire de package
-          mkdir -p package
+          # Créer un répertoire temporaire pour le package
+          PACKAGE_DIR="package_${{ runner.os }}"
+          mkdir -p $PACKAGE_DIR
           
           # Copier l'exécutable
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp dist/student_manager.exe package/
+            cp dist/student_manager.exe $PACKAGE_DIR/
           else
-            cp dist/student_manager package/
+            cp dist/student_manager $PACKAGE_DIR/
           fi
           
           # Copier les assets
-          cp -r assets package/
+          cp -r assets $PACKAGE_DIR/
           
-          # Créer l'archive
+          # Créer l'archive DEPUIS le répertoire package
+          cd $PACKAGE_DIR
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cd package
             7z a ../dist/student_manager-${{ runner.os }}.zip *
           else
-            cd package
-            zip -r ../dist/student_manager-${{ runner.os }}.zip *
+            zip -r ../dist/student_manager-${{ runner.os }}.zip .
           fi
+          
+          # Nettoyer
+          cd ..
+          rm -rf $PACKAGE_DIR
         shell: bash
 
       # 6️⃣ Upload artifact
