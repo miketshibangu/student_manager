@@ -3,6 +3,7 @@ import sqlite3
 import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -26,11 +27,15 @@ class Database:
                     password=os.getenv("DB_PASSWORD", ""),
                     port=os.getenv("DB_PORT", "5432")
                 )
+                # Configuration pour PostgreSQL
+                self.connection.autocommit = False
             else:  # SQLite par défaut
                 db_path = os.getenv("SQLITE_PATH", "./data/student_manager.db")
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
                 self.connection = sqlite3.connect(db_path)
                 self.connection.row_factory = sqlite3.Row  # dict-like results
+                # Configuration pour SQLite
+                self.connection.isolation_level = None  # Auto-commit désactivé
 
             self.create_tables()
             self.insert_default_data()
@@ -39,22 +44,24 @@ class Database:
             raise
 
     def create_tables(self):
+        cursor = None
         try:
             cursor = self.connection.cursor()
 
             # Différence SERIAL vs AUTOINCREMENT
             auto_inc = "SERIAL PRIMARY KEY" if self.db_engine == "postgresql" else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
-            cursor.execute(f"""
+            # Création des tables
+            tables = [
+                f"""
                 CREATE TABLE IF NOT EXISTS faculties (
                     id {auto_inc},
                     name VARCHAR(100) NOT NULL UNIQUE,
                     code VARCHAR(10) NOT NULL UNIQUE,
                     description TEXT
                 )
-            """)
-
-            cursor.execute(f"""
+                """,
+                f"""
                 CREATE TABLE IF NOT EXISTS departments (
                     id {auto_inc},
                     name VARCHAR(100) NOT NULL,
@@ -62,9 +69,8 @@ class Database:
                     faculty_id INTEGER REFERENCES faculties(id),
                     UNIQUE(name, faculty_id)
                 )
-            """)
-
-            cursor.execute(f"""
+                """,
+                f"""
                 CREATE TABLE IF NOT EXISTS promotions (
                     id {auto_inc},
                     name VARCHAR(100) NOT NULL,
@@ -72,9 +78,8 @@ class Database:
                     department_id INTEGER REFERENCES departments(id),
                     UNIQUE(name, department_id, year)
                 )
-            """)
-
-            cursor.execute(f"""
+                """,
+                f"""
                 CREATE TABLE IF NOT EXISTS students (
                     id {auto_inc},
                     first_name VARCHAR(100) NOT NULL,
@@ -91,17 +96,26 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
+                """
+            ]
+
+            for table_sql in tables:
+                cursor.execute(table_sql)
 
             self.connection.commit()
-            cursor.close()
+            
         except Exception as e:
             print(f"❌ Erreur lors de la création des tables: {e}")
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             raise
+        finally:
+            if cursor:
+                cursor.close()
 
     def insert_default_data(self):
         """Insère les données par défaut de l'UNIKIN si elles n'existent pas"""
+        cursor = None
         try:
             cursor = self.connection.cursor()
             
@@ -112,7 +126,7 @@ class Database:
             if faculty_count == 0:
                 print("📦 Insertion des données par défaut de l'UNIKIN...")
                 
-                # Insertion des facultés de l'UNIKIN (liste complète 2025)
+                # Insertion des facultés de l'UNIKIN
                 faculties = [
                     ("Droit", "DROIT", "Faculté de Droit"),
                     ("Sciences Économiques et de Gestion", "ECO-GEST", "Faculté des Sciences Économiques et de Gestion"),
@@ -145,7 +159,7 @@ class Database:
                         faculty_id = cursor.lastrowid
                     faculty_ids[name] = faculty_id
                 
-                # Insertion des départements (liste complète 2025)
+                # Insertion des départements
                 departments = [
                     # Droit
                     ("Droit privé et judiciaire", "D-PRIV", "Droit"),
@@ -250,7 +264,6 @@ class Database:
                 from datetime import datetime
                 current_year = datetime.now().year
                 
-                promotions = []
                 for department_name in department_ids:
                     department_id = department_ids[department_name]
                     
@@ -262,32 +275,32 @@ class Database:
                     ]
                     
                     for level in lmd_levels:
-                        promotions.append((f"{level} - {department_name}", current_year, department_id))
-                
-                for name, year, department_id in promotions:
-                    query = f"INSERT INTO promotions (name, year, department_id) VALUES ({param_style}, {param_style}, {param_style})"
-                    cursor.execute(query, (name, year, department_id))
+                        query = f"INSERT INTO promotions (name, year, department_id) VALUES ({param_style}, {param_style}, {param_style})"
+                        cursor.execute(query, (f"{level} - {department_name}", current_year, department_id))
                 
                 self.connection.commit()
                 print("✅ Données par défaut de l'UNIKIN insérées avec succès!")
             
         except Exception as e:
             print(f"❌ Erreur lors de l'insertion des données par défaut: {e}")
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
 
     def execute_query(self, query, params=None, return_id=False):
+        """Exécute une requête SQL avec gestion propre des transactions"""
         cursor = None
         try:
             # Conversion des paramètres pour SQLite
             if self.db_engine != "postgresql":
-                import re
-                query = re.sub(r'(?<!\\)%s', '?', query)
+                query = query.replace('%s', '?')
             
             cursor = self.connection.cursor()
             cursor.execute(query, params or ())
 
+            # Pour les requêtes SELECT, retourner les résultats
             if query.strip().upper().startswith("SELECT"):
                 rows = cursor.fetchall()
                 if self.db_engine == "postgresql":
@@ -295,33 +308,94 @@ class Database:
                     result = [dict(zip(columns, row)) for row in rows]
                 else:
                     result = [dict(row) for row in rows]
-                cursor.close()
                 return result
 
+            # Commit pour les autres types de requêtes
             self.connection.commit()
 
+            # Pour les INSERT avec retour d'ID
             if return_id:
                 if self.db_engine == "postgresql":
                     cursor.execute("SELECT LASTVAL()")
                     result = cursor.fetchone()[0]
                 else:
                     result = cursor.lastrowid
-                cursor.close()
                 return result
 
-            result = cursor.rowcount
-            cursor.close()
-            return result
+            # Pour UPDATE/DELETE, retourner le nombre de lignes affectées
+            return cursor.rowcount
             
         except Exception as e:
+            # Rollback en cas d'erreur
+            if self.connection:
+                self.connection.rollback()
             print(f"❌ Erreur lors de l'exécution de la requête: {e}")
             print(f"📋 Requête: {query}")
             print(f"🔧 Paramètres: {params}")
-            self.connection.rollback()
+            raise
+        finally:
+            # Toujours fermer le curseur
             if cursor:
                 cursor.close()
+
+    def execute_query_with_transaction(self, query, params=None, return_id=False):
+        """Version alternative avec gestion explicite des transactions"""
+        cursor = None
+        try:
+            # Début de transaction explicite pour SQLite
+            if self.db_engine != "postgresql":
+                self.connection.execute("BEGIN TRANSACTION")
+            
+            # Conversion des paramètres pour SQLite
+            if self.db_engine != "postgresql":
+                query = query.replace('%s', '?')
+            
+            cursor = self.connection.cursor()
+            cursor.execute(query, params or ())
+
+            # Pour les requêtes SELECT, retourner les résultats
+            if query.strip().upper().startswith("SELECT"):
+                rows = cursor.fetchall()
+                if self.db_engine == "postgresql":
+                    columns = [desc[0] for desc in cursor.description]
+                    result = [dict(zip(columns, row)) for row in rows]
+                else:
+                    result = [dict(row) for row in rows]
+                return result
+
+            # Commit de la transaction
+            self.connection.commit()
+
+            # Pour les INSERT avec retour d'ID
+            if return_id:
+                if self.db_engine == "postgresql":
+                    cursor.execute("SELECT LASTVAL()")
+                    result = cursor.fetchone()[0]
+                else:
+                    result = cursor.lastrowid
+                return result
+
+            return cursor.rowcount
+            
+        except Exception as e:
+            # Rollback en cas d'erreur
+            if self.connection:
+                self.connection.rollback()
+            print(f"❌ Erreur lors de l'exécution de la requête: {e}")
             raise
+        finally:
+            if cursor:
+                cursor.close()
 
     def close(self):
+        """Ferme la connexion à la base de données"""
         if self.connection:
-            self.connection.close()
+            try:
+                self.connection.close()
+                print("✅ Connexion à la base de données fermée")
+            except Exception as e:
+                print(f"❌ Erreur lors de la fermeture de la connexion: {e}")
+
+    def __del__(self):
+        """Destructeur pour fermer la connexion"""
+        self.close()

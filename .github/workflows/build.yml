@@ -12,92 +12,57 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            spec_name: Linux
+            icon_path: assets/icons/app_icon.png
           - os: windows-latest  
-            spec_name: Windows
+            icon_path: assets/icons/app_icon.ico
           - os: macos-latest
-            spec_name: macOS
+            icon_path: assets/icons/app_icon.icns
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify icon exists
+        run: |
+          if [ ! -f "${{ matrix.icon_path }}" ]; then
+            echo "❌ ERREUR: Fichier d'icône introuvable: ${{ matrix.icon_path }}"
+            exit 1
+          else
+            echo "✅ Icône trouvée: ${{ matrix.icon_path }}"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install system dependencies (Ubuntu)
+      - name: Install system dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1 libglib2.0-0
+          # Packages essentiels pour PySide6 sur Linux
+          sudo apt-get install -y libxcb-xinerama0 libgl1
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install pyinstaller PySide6
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-      - name: Create PyInstaller spec file
+      - name: Build executable
         run: |
-          cat > build.spec << EOF
-          # -*- mode: python ; coding: utf-8 -*-
-
-          block_cipher = None
-
-          a = Analysis(
-              ['main.py'],
-              pathex=[],
-              binaries=[],
-              datas=[],
-              hiddenimports=[
-                  'PySide6.QtCore',
-                  'PySide6.QtGui', 
-                  'PySide6.QtWidgets',
-                  'PySide6.QtNetwork',
-                  'shiboken6'
-              ],
-              hookspath=[],
-              hooksconfig={},
-              runtime_hooks=[],
-              excludes=[],
-              win_no_prefer_redirects=False,
-              win_private_assemblies=False,
-              cipher=block_cipher,
-              noarchive=False,
-          )
-
-          pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-          exe = EXE(
-              pyz,
-              a.scripts,
-              a.binaries,
-              a.zipfiles,
-              a.datas,
-              [],
-              name='mon_app',
-              debug=False,
-              bootloader_ignore_signals=False,
-              strip=False,
-              upx=True,
-              upx_exclude=[],
-              runtime_tmpdir=None,
-              console=False,
-              disable_windowed_traceback=False,
-              target_arch=None,
-              codesign_identity=None,
-              entitlements_file=None,
-          )
-          EOF
-
-      - name: Build executable with PyInstaller
-        run: pyinstaller build.spec --onefile
-
-      - name: List built files (for debugging)
-        run: ls -la dist/
+          # Construction différente selon l'OS
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            pyinstaller --onefile --windowed --icon "${{ matrix.icon_path }}" --name mon_app main.py
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            pyinstaller --onefile --windowed --icon "${{ matrix.icon_path }}" --name mon_app main.py
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            pyinstaller --onefile --windowed --icon "${{ matrix.icon_path }}" --name mon_app main.py
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mon_app-${{ matrix.spec_name }}
-          path: dist/
+          name: mon_app-${{ runner.os }}
+          path: |
+            dist/*
+            # Capture tous les fichiers générés

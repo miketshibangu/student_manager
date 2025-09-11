@@ -1,18 +1,21 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, 
                                QLineEdit, QComboBox, QPushButton, QMessageBox,
                                QLabel, QGroupBox, QTextEdit, QFileDialog, QScrollArea, QWidget, QSizePolicy)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QFont, QIcon, QPainter, QColor, QPalette
 from database import Database
 from models import Student
 from image_utils import ImageUtils
 
 class StudentDialog(QDialog):
+    theme_changed = Signal(str)
+    
     def __init__(self, parent=None, student=None):
         super().__init__(parent)
         self.student = student
         self.db = Database()
         self.photo_path = None
+        self.current_theme = "dark"  # Thème par défaut
         self.setup_ui()
         self.load_data()
         
@@ -52,18 +55,7 @@ class StudentDialog(QDialog):
         self.photo_label = QLabel()
         self.photo_label.setFixedSize(150, 150)
         self.photo_label.setAlignment(Qt.AlignCenter)
-        self.photo_label.setStyleSheet("""
-            QLabel {
-                border: 3px dashed #a0a0a0;
-                border-radius: 75px;
-                background: #f8f9fa;
-                font-size: 12px;
-            }
-            QLabel:hover {
-                border-color: #4e73df;
-                background: #eaecf4;
-            }
-        """)
+        self.photo_label.setProperty("class", "photo-label")
         self.photo_label.setText("Cliquez pour\najouter une photo")
         self.photo_label.setWordWrap(True)
         self.photo_label.mousePressEvent = self.select_photo
@@ -75,20 +67,7 @@ class StudentDialog(QDialog):
         self.photo_button = QPushButton("📁 Parcourir les fichiers")
         self.photo_button.clicked.connect(self.select_photo)
         self.photo_button.setFixedSize(180, 40)
-        self.photo_button.setStyleSheet("""
-            QPushButton {
-                background: #4e73df;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background: #2e59d9;
-            }
-        """)
+        self.photo_button.setProperty("class", "secondary")
         
         photo_button_layout.addWidget(self.photo_button)
         photo_button_layout.addStretch()
@@ -200,13 +179,7 @@ class StudentDialog(QDialog):
 
         # Boutons en bas
         button_widget = QWidget()
-        button_widget.setStyleSheet("""
-            QWidget {
-                background: #f8f9fa;
-                border-top: 2px solid #e3e6f0;
-                border-radius: 8px;
-            }
-        """)
+        button_widget.setProperty("class", "button-container")
         button_layout = QHBoxLayout(button_widget)
         button_layout.setContentsMargins(20, 15, 20, 15)
         button_layout.setSpacing(20)
@@ -214,9 +187,11 @@ class StudentDialog(QDialog):
         self.save_button = QPushButton("💾 Enregistrer")
         self.save_button.setMinimumSize(150, 45)
         self.save_button.setDefault(True)
+        self.save_button.setProperty("class", "primary")
         
         self.cancel_button = QPushButton("❌ Annuler")
         self.cancel_button.setMinimumSize(150, 45)
+        self.cancel_button.setProperty("class", "danger")
 
         self.save_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
@@ -227,153 +202,263 @@ class StudentDialog(QDialog):
 
         main_layout.addWidget(button_widget)
         
-        # Appliquer les styles
-        self.apply_styles()
+        # Appliquer les styles initiaux
+        self.apply_theme(self.current_theme)
         
-        # Charger l'image par défaut
-        self.update_photo_display()
+        # Connecter le signal de changement de thème
+        self.theme_changed.connect(self.apply_theme)
+
+    def apply_theme(self, theme_name):
+        """Applique un thème light ou dark au dialogue"""
+        self.current_theme = theme_name
+        palette = QPalette()
+        
+        if theme_name == "dark":
+            # Palette pour le thème sombre
+            palette.setColor(QPalette.Window, QColor(45, 45, 48))
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(30, 30, 30))
+            palette.setColor(QPalette.AlternateBase, QColor(45, 45, 48))
+            palette.setColor(QPalette.Text, Qt.white)
+            palette.setColor(QPalette.Button, QColor(60, 60, 60))
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.Highlight, QColor(0, 120, 215))
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+        else:
+            # Palette pour le thème clair
+            palette.setColor(QPalette.Window, QColor(240, 240, 240))
+            palette.setColor(QPalette.WindowText, Qt.black)
+            palette.setColor(QPalette.Base, Qt.white)
+            palette.setColor(QPalette.AlternateBase, QColor(245, 245, 245))
+            palette.setColor(QPalette.Text, Qt.black)
+            palette.setColor(QPalette.Button, QColor(240, 240, 240))
+            palette.setColor(QPalette.ButtonText, Qt.black)
+            palette.setColor(QPalette.Highlight, QColor(0, 120, 215))
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+        
+        self.setPalette(palette)
+        self.apply_styles()
 
     def apply_styles(self):
-        # Configuration de la police pour une meilleure lisibilité
-        font = QFont("Segoe UI", 11)
-        self.setFont(font)
+        """Applique les styles CSS en fonction du thème actuel"""
+        if self.current_theme == "dark":
+            style = """
+                QDialog {
+                    background: #2d2d30;
+                    color: #ffffff;
+                    font-family: 'Segoe UI', 'Arial', sans-serif;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                    font-size: 14px;
+                    border: 2px solid #3d3d40;
+                    border-radius: 8px;
+                    margin-top: 1ex;
+                    padding-top: 16px;
+                    background: #2d2d30;
+                    color: #4e73df;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 16px;
+                    padding: 0 10px 0 10px;
+                    color: #4e73df;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QLineEdit, QTextEdit, QComboBox {
+                    padding: 12px;
+                    border: 2px solid #3d3d40;
+                    border-radius: 8px;
+                    background: #1e1e1e;
+                    font-size: 13px;
+                    color: #ffffff;
+                    selection-background-color: #4e73df;
+                    selection-color: white;
+                }
+                QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+                    border: 2px solid #4e73df;
+                }
+                QLineEdit:hover, QComboBox:hover {
+                    border: 2px solid #5a7cdf;
+                }
+                QTextEdit {
+                    background: #1e1e1e;
+                    color: #ffffff;
+                }
+                QComboBox QAbstractItemView {
+                    background: #2d2d30;
+                    border: 2px solid #3d3d40;
+                    color: #ffffff;
+                    selection-background-color: #4e73df;
+                }
+                QLabel {
+                    color: #cccccc;
+                    font-size: 13px;
+                }
+                QLabel[class="photo-label"] {
+                    border: 3px dashed #666666;
+                    border-radius: 75px;
+                    background: #2d2d30;
+                    font-size: 12px;
+                    color: #cccccc;
+                }
+                QLabel[class="photo-label"]:hover {
+                    border-color: #4e73df;
+                    background: #3d3d40;
+                }
+                QPushButton[class="primary"] {
+                    background: #4e73df;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 12px 24px;
+                    font-weight: bold;
+                }
+                QPushButton[class="primary"]:hover {
+                    background: #2e59d9;
+                }
+                QPushButton[class="primary"]:pressed {
+                    background: #1a46c4;
+                }
+                QPushButton[class="secondary"] {
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px;
+                    font-weight: bold;
+                }
+                QPushButton[class="secondary"]:hover {
+                    background: #5a6268;
+                }
+                QPushButton[class="danger"] {
+                    background: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 12px 24px;
+                    font-weight: bold;
+                }
+                QPushButton[class="danger"]:hover {
+                    background: #c82333;
+                }
+                QWidget[class="button-container"] {
+                    background: #2d2d30;
+                    border-top: 2px solid #3d3d40;
+                    border-radius: 8px;
+                }
+            """
+        else:
+            style = """
+                QDialog {
+                    background: #ffffff;
+                    color: #000000;
+                    font-family: 'Segoe UI', 'Arial', sans-serif;
+                }
+                QGroupBox {
+                    font-weight: bold;
+                    font-size: 14px;
+                    border: 2px solid #d1d3e2;
+                    border-radius: 8px;
+                    margin-top: 1ex;
+                    padding-top: 16px;
+                    background: #f8f9fc;
+                    color: #4e73df;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 16px;
+                    padding: 0 10px 0 10px;
+                    color: #4e73df;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QLineEdit, QTextEdit, QComboBox {
+                    padding: 12px;
+                    border: 2px solid #d1d3e2;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    font-size: 13px;
+                    color: #000000;
+                    selection-background-color: #4e73df;
+                    selection-color: white;
+                }
+                QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+                    border: 2px solid #4e73df;
+                }
+                QLineEdit:hover, QComboBox:hover {
+                    border: 2px solid #bac8f3;
+                }
+                QTextEdit {
+                    background: #ffffff;
+                    color: #000000;
+                }
+                QComboBox QAbstractItemView {
+                    background: #ffffff;
+                    border: 2px solid #d1d3e2;
+                    color: #000000;
+                    selection-background-color: #4e73df;
+                }
+                QLabel {
+                    color: #5a5c69;
+                    font-size: 13px;
+                }
+                QLabel[class="photo-label"] {
+                    border: 3px dashed #a0a0a0;
+                    border-radius: 75px;
+                    background: #f8f9fa;
+                    font-size: 12px;
+                    color: #666666;
+                }
+                QLabel[class="photo-label"]:hover {
+                    border-color: #4e73df;
+                    background: #eaecf4;
+                }
+                QPushButton[class="primary"] {
+                    background: #4e73df;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 12px 24px;
+                    font-weight: bold;
+                }
+                QPushButton[class="primary"]:hover {
+                    background: #2e59d9;
+                }
+                QPushButton[class="primary"]:pressed {
+                    background: #1a46c4;
+                }
+                QPushButton[class="secondary"] {
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px;
+                    font-weight: bold;
+                }
+                QPushButton[class="secondary"]:hover {
+                    background: #5a6268;
+                }
+                QPushButton[class="danger"] {
+                    background: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 12px 24px;
+                    font-weight: bold;
+                }
+                QPushButton[class="danger"]:hover {
+                    background: #c82333;
+                }
+                QWidget[class="button-container"] {
+                    background: #f8f9fa;
+                    border-top: 2px solid #e3e6f0;
+                    border-radius: 8px;
+                }
+            """
         
-        style = """
-            QDialog {
-                background: #ffffff;
-                font-family: 'Segoe UI', 'Arial', sans-serif;
-            }
-            QGroupBox {
-                font-weight: bold;
-                font-size: 14px;
-                border: 2px solid #e3e6f0;
-                border-radius: 8px;
-                margin-top: 1ex;
-                padding-top: 16px;
-                background: #f8f9fc;
-                color: #4e73df;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 10px 0 10px;
-                color: #4e73df;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QLineEdit, QTextEdit, QComboBox {
-                padding: 12px;
-                border: 2px solid #d1d3e2;
-                border-radius: 8px;
-                background: #ffffff;
-                font-size: 13px;
-                color: #6e707e;
-                selection-background-color: #4e73df;
-                selection-color: white;
-                min-height: 25px;
-            }
-            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-                border: 2px solid #4e73df;
-                background: #ffffff;
-            }
-            QLineEdit:hover, QComboBox:hover {
-                border: 2px solid #bac8f3;
-            }
-            QComboBox {
-                min-width: 280px;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 35px;
-                background: #4e73df;
-                border-radius: 0 6px 6px 0;
-            }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 6px solid transparent;
-                border-right: 6px solid transparent;
-                border-top: 8px solid white;
-                width: 0;
-                height: 0;
-            }
-            QComboBox QAbstractItemView {
-                background: white;
-                border: 2px solid #e3e6f0;
-                border-radius: 8px;
-                outline: none;
-                selection-background-color: #4e73df;
-                selection-color: white;
-                font-size: 13px;
-                min-width: 300px;
-                max-height: 200px;
-            }
-            QTextEdit {
-                padding: 10px;
-                font-size: 13px;
-            }
-            QPushButton {
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-weight: bold;
-                font-size: 14px;
-                min-height: 45px;
-                border: none;
-            }
-            QPushButton:hover {
-                opacity: 0.95;
-                transform: translateY(-1px);
-            }
-            QPushButton:pressed {
-                opacity: 0.9;
-                transform: translateY(1px);
-            }
-            QLabel {
-                font-size: 13px;
-                color: #5a5c69;
-            }
-            QScrollArea {
-                border: none;
-                background: #ffffff;
-            }
-        """
         self.setStyleSheet(style)
-        
-        # Style spécifique pour les boutons principaux
-        self.save_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #4e73df, stop: 1 #224abe);
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #5a7cdf, stop: 1 #2a53c3);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #3e63c9, stop: 1 #1a3e9e);
-            }
-        """)
-        
-        self.cancel_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #e74a3b, stop: 1 #be2617);
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #ea6255, stop: 1 #c53829);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #d63a2b, stop: 1 #a21c0f);
-            }
-        """)
 
     def load_data(self):
         try:
@@ -395,6 +480,7 @@ class StudentDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du chargement: {str(e)}")
 
+    # Les autres méthodes restent inchangées...
     def load_student_academic_data(self):
         """Charge les données académiques de l'étudiant existant"""
         try:
@@ -538,7 +624,7 @@ class StudentDialog(QDialog):
         return { 
             'last_name': self.last_name_edit.text().strip(),
             'postnom': self.postnom_edit.text().strip(),
-            'first_name': self.first_name_edit.text().strip(),
+            'first_name': self.last_name_edit.text().strip(),
             'email': self.email_edit.text().strip() or None,
             'phone': self.phone_edit.text().strip() or None,
             'address': self.address_edit.toPlainText().strip() or None,
