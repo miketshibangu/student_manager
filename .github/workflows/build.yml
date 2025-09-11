@@ -17,11 +17,11 @@ jobs:
       - name: Debug structure
         run: |
           echo "=== STRUCTURE DU PROJET ==="
-          ls -la
+          dir || ls -la
           echo "=== REQUIREMENTS.TXT ==="
-          cat requirements.txt || echo "Fichier requirements.txt introuvable"
+          type requirements.txt || cat requirements.txt || echo "Fichier requirements.txt introuvable"
           echo "=== ICONES ==="
-          ls -la assets/icons/ || echo "Dossier icons non trouvé"
+          dir assets\\icons || ls -la assets/icons/ || echo "Dossier icons non trouvé"
 
       - name: Set up Python
         uses: actions/setup-python@v5
