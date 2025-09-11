@@ -28,57 +28,59 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # 4️⃣ Build executable Linux/macOS
-      - name: Build executable (Linux/macOS)
-        if: runner.os != 'Windows'
+      # 4️⃣ Build executable avec gestion des icônes
+      - name: Build executable
         run: |
-          ICON_PATH="assets/icons/app_icon"
-          if [ "${{ matrix.os }}" == "macos-latest" ]; then
-              ICON="$ICON_PATH.icns"
+          # Déterminer l'extension de l'icône
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ICON="assets/icons/app_icon.ico"
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            ICON="assets/icons/app_icon.icns"
           else
-              ICON="$ICON_PATH.png"
+            ICON="assets/icons/app_icon.png"
           fi
+          
+          # Construire l'exécutable
           pyinstaller --onefile \
                       --name student_manager \
                       --icon "$ICON" \
                       --hidden-import=PySide6 \
-                      --hidden-import=PySide6_Addons \
-                      --hidden-import=PySide6_Essentials \
+                      --hidden-import=PySide6.QtCore \
+                      --hidden-import=PySide6.QtGui \
+                      --hidden-import=PySide6.QtWidgets \
+                      --add-data "assets:assets" \
                       main.py
+        shell: bash
 
-      # 5️⃣ Build executable Windows
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
+      # 5️⃣ Créer le package ZIP
+      - name: Create package
         run: |
-          pyinstaller --onefile \
-                      --name student_manager \
-                      --icon assets/icons/app_icon.ico \
-                      --hidden-import=PySide6 \
-                      --hidden-import=PySide6_Addons \
-                      --hidden-import=PySide6_Essentials \
-                      main.py
-        shell: pwsh
+          # Créer le répertoire de package
+          mkdir -p package
+          
+          # Copier l'exécutable
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/student_manager.exe package/
+          else
+            cp dist/student_manager package/
+          fi
+          
+          # Copier les assets
+          cp -r assets package/
+          
+          # Créer l'archive
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cd package
+            7z a ../dist/student_manager-${{ runner.os }}.zip *
+          else
+            cd package
+            zip -r ../dist/student_manager-${{ runner.os }}.zip *
+          fi
+        shell: bash
 
-      # 6️⃣ Créer ZIP Linux/macOS
-      - name: Package ZIP (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          cd dist
-          zip -r student_manager-${{ matrix.os }}.zip student_manager assets/icons
-
-      # 7️⃣ Créer ZIP Windows
-      - name: Package ZIP (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          Compress-Archive -Path dist/student_manager.exe,assets/icons -DestinationPath dist/student_manager-windows-latest.zip
-        shell: pwsh
-
-      # 8️⃣ Upload artifacts
+      # 6️⃣ Upload artifact
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: student_manager-${{ matrix.os }}
-          path: |
-            dist/student_manager-${{ matrix.os }}.zip
-            dist/student_manager-windows-latest.zip
-
+          name: student_manager-${{ runner.os }}
+          path: dist/student_manager-${{ runner.os }}.zip
